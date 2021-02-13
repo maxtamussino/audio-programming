@@ -13,6 +13,13 @@
 #include <libraries/math_neon/math_neon.h>
 #include <cmath>
 #include "Wavetable.h"
+#include <iostream>
+
+#define BODE_ACTIVATE true
+#define BODE_NUMPOINTS 150
+#define BODE_START 100
+#define BODE_FACTOR 1.03
+#define BODE_FRAMESPERFREQ 200
 
 // Browser-based GUI to adjust parameters
 Gui gGui;
@@ -24,18 +31,41 @@ Scope gScope;
 // Oscillator objects
 Wavetable gSineOscillator, gSawtoothOscillator;
 
-// ****************************************************************
-// TODO: declare your global variables here for coefficients and filter state
-// ****************************************************************
+// Filter coefficients
+float gFilterB0 = 0.0;
+float gFilterB1 = 0.0;
+float gFilterA1 = 0.0;
+
+// Filter state
+float gLastY = 0.0;
+float gLastX = 0.0;
+
+// Bode plot generation
+float gBodeFrequencies[BODE_NUMPOINTS];
+float gBodeGains[BODE_NUMPOINTS];
+unsigned int gBodeFreqIndex = 0;
+unsigned int gBodeFrameCounter = 0;
+bool gBodeActive = BODE_ACTIVATE;
+
 
 // Calculate filter coefficients given specifications
 // frequencyHz -- filter frequency in Hertz (needs to be converted to discrete time frequency)
 // resonance -- normalised parameter 0-1 which is related to filter Q
 void calculate_coefficients(float sampleRate, float frequencyHz, float resonance)
 {
-	// ******************************************************************
-	// TODO: calculate filter coefficients following the assignment brief 
-	// ******************************************************************
+	// Calculate powers of omega_c
+	float omega_c = 2 * M_PI * frequencyHz / sampleRate;
+	float omega_c2 = omega_c * omega_c;
+	float omega_c3 = omega_c2 * omega_c;
+	float omega_c4 = omega_c3 * omega_c;
+	
+	// Polynomial model for g
+	float g = 0.9892 * omega_c - 0.4342 * omega_c2 + 0.1381 * omega_c3 - 0.0202 * omega_c4;
+	
+	// Filter coefficients
+	gFilterB0 = g * 1.0 / 1.3;
+	gFilterB1 = g * 0.3 / 1.3;
+	gFilterA1 = g - 1.0;
 }
 
 
@@ -69,11 +99,19 @@ bool setup(BelaContext *context, void *userData)
 	
 	// Arguments: name, default value, minimum, maximum, increment
 	// Create sliders for oscillator and filter settings
-	gGuiController.addSlider("Oscillator Frequency", 440, 40, 8000, 0);
+	gGuiController.addSlider("Oscillator Frequency", 100, 40, 8000, 0);
 	gGuiController.addSlider("Oscillator Amplitude", 0.5, 0, 2.0, 0);
 	
 	// Set up the scope
 	gScope.setup(2, context->audioSampleRate);
+	
+	// Set up bode frequencies
+	gBodeFrequencies[0] = BODE_START;
+	gBodeGains[0] = 0;
+	for (unsigned int i = 1; i < BODE_NUMPOINTS; i++) {
+		gBodeFrequencies[i] = gBodeFrequencies[i - 1] * BODE_FACTOR;
+		gBodeGains[i] = 0;
+	}
 
 	return true;
 }
@@ -81,15 +119,35 @@ bool setup(BelaContext *context, void *userData)
 void render(BelaContext *context, void *userData)
 {
 	// Read the slider values
-	float oscFrequency = gGuiController.getSliderValue(0);	
+	float oscFrequency = gGuiController.getSliderValue(0);
 	float oscAmplitude = gGuiController.getSliderValue(1);	
+	
+	// Bode plot frequency selection
+	if (gBodeActive) {
+		// Override frequency and amplitude
+		oscFrequency = gBodeFrequencies[gBodeFreqIndex];
+		oscAmplitude = 0.5;
+		
+		// Check if maximum frame fer frequency is reached
+		gBodeFrameCounter++;
+		if (gBodeFrameCounter == BODE_FRAMESPERFREQ) {
+			gBodeFrameCounter = 0;
+			gBodeFreqIndex++;
+			
+			// Check if finished
+			if (gBodeFreqIndex == BODE_NUMPOINTS) {
+				// Stop bode
+				gBodeActive = false;
+			}
+		}
+	}
 
 	// Set the oscillator frequency
 	gSineOscillator.setFrequency(oscFrequency);
 	gSawtoothOscillator.setFrequency(oscFrequency);
 
 	// Calculate new filter coefficients
-	calculate_coefficients(context->audioSampleRate, 1000.0, 0.0);
+	calculate_coefficients(context->audioSampleRate, 4000.0, 0.0);
 	
     for(unsigned int n = 0; n < context->audioFrames; n++) {
     	// Uncomment one line or the other to choose sine or sawtooth oscillator
@@ -97,12 +155,23 @@ void render(BelaContext *context, void *userData)
 		float in = oscAmplitude * gSineOscillator.process();
 		// float in = oscAmplitude * gSawtoothOscillator.process();
             
-        // ****************************************************************
-        // TODO: apply the filter to the input signal
+        // Apply the filter to the input signal
+		float out = gFilterB0 * in + gFilterB1 * gLastX - gFilterA1 * gLastY;
  
-		float out = in;		// replace with your code for each step
- 
-        // ****************************************************************
+        // Save filter state
+		gLastX = in;
+		gLastY = out;
+		
+		// Save bode gain
+		if (gBodeActive) {
+			float gain = out * 2;
+			if (gain < 0) {
+				gain = - gain;
+			}
+			if (gain > gBodeGains[gBodeFreqIndex]) {
+				gBodeGains[gBodeFreqIndex] = gain;
+			}
+		}
             
         // Write the output to every audio channel
     	for(unsigned int channel = 0; channel < context->audioOutChannels; channel++) {
@@ -115,5 +184,14 @@ void render(BelaContext *context, void *userData)
 
 void cleanup(BelaContext *context, void *userData)
 {
-
+	// Print result (for matlab)
+	std::cout << "frequencies = [";
+	for (unsigned int i = 0; i < BODE_NUMPOINTS; i++) {
+		std::cout << gBodeFrequencies[i] << ", ";
+	}
+	std::cout << "]\ngains = [";
+	for (unsigned int i = 0; i < BODE_NUMPOINTS; i++) {
+		std::cout << gBodeGains[i] << ", ";
+	}
+	std::cout << "]\n";
 }
