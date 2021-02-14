@@ -78,24 +78,18 @@
 \pagebreak
 
 \section{Introduction} \label{sec:intro}
-This report discusses the implementation of a digital emulation of a Moog voltage-controlled filter. The overall structure of this filter is depicted in \Cref{fig:overall-structure}.
+This report discusses the implementation of a digital emulation \cite{Stilson1996} of a Moog voltage-controlled filter. The overall structure of this filter is depicted in \Cref{fig:overall-structure}.
 
 \begin{figure}
 	\centering
-	\includegraphics[width=\textwidth]{overall-structure.jpg}
-	\caption{Overall structure of the Moog voltage-controlled filter \cite{Stilson1996}}
+	\includegraphics[width=\textwidth]{feedback.jpg}
+	\caption{Overall structure of the implemented Moog voltage-controlled filter, adapted from \cite{Vaelimaeki2006}}
 	\label{fig:overall-structure}
 \end{figure}
 
-\section{First-order filter section} \label{sec:fofs}
-As proposed in \cite{Vaelimaeki2006}, one of the four first-order sections of the filter is implemented as depicted in \Cref{fig:first-order-section}. The equations for the individual nodes annotated are given in \Cref{eq:nodes1,eq:nodes2,eq:nodes3,eq:nodes4}. The filter equation was derived from these equations to be \Cref{eq:filter}. By comparing the filter equation the standard form of a first-order IIR filter, which is given in \Cref{eq:first-order-iir}, the filter coefficients $b_0$, $b_1$ and $a_1$ were calculated. The results are given in \Cref{eq:coefficients}.
-
-\begin{figure}
-	\centering
-	\includegraphics[width=\textwidth]{first-order-section.jpg}
-	\caption{First-order section of the filter depicted in \Cref{fig:overall-structure} \cite{Vaelimaeki2006}}
-	\label{fig:first-order-section}
-\end{figure}
+\section{First-order filter section} \label{sec:first-order-fs}
+\subsection{Derivation}
+As proposed in \cite{Vaelimaeki2006}, one of the four first-order sections of the filter is implemented as depicted in \Cref{fig:first-order-section}. The equations for the individual nodes annotated are given in \Cref{eq:nodes1,eq:nodes2,eq:nodes3,eq:nodes4}. 
 
 \begin{align}
 	\label{eq:nodes1}
@@ -108,12 +102,16 @@ As proposed in \cite{Vaelimaeki2006}, one of the four first-order sections of th
 	G &= g \cdot F & y[n] &= E + G
 \end{align}
 
+The filter equation given in  \Cref{eq:filter} was then derived from these equations.
+
 \begin{equation}
 	\label{eq:filter}
 	y[n] = g \frac{1}{1.3} \cdot x[n] +
 	g \frac{0.3}{1.3} \cdot x[n-1] +
 	(1-g) \cdot y[n-1]
 \end{equation}
+
+The filter equation was then compared to the standard form of a first-order IIR filter, which is given in \Cref{eq:first-order-iir}.
 
 \begin{equation}
 	\label{eq:first-order-iir}
@@ -122,6 +120,8 @@ As proposed in \cite{Vaelimaeki2006}, one of the four first-order sections of th
 	a_1 \cdot y[n-1]
 \end{equation}
 
+The resulting filter coefficients $b_0$, $b_1$ and $a_1$ were then calculated and are given in \Cref{eq:coefficients}.
+
 \begin{align}
 	\label{eq:coefficients}
 	b_0 &= g \frac{1}{1.3} &
@@ -129,29 +129,25 @@ As proposed in \cite{Vaelimaeki2006}, one of the four first-order sections of th
 	a_1 &= g - 1
 \end{align}
 
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{first-order-section.jpg}
+	\caption{First-order section of the filter depicted in \Cref{fig:overall-structure} \cite{Vaelimaeki2006}}
+	\label{fig:first-order-section}
+\end{figure}
+
 \subsection{Performance}
 
-The parameter $g$ of the filter coefficients firstly calculated simply by $g = 2 \pi \cdot f_c / f_s$. The filter frequency response using this formula is given in \Cref{fig:prim-resp} for the two different cutoff frequencies. It is clearly visible that the intended cutoff frequencies were not met. In \Cref{subfig:prim-resp-1000}, for $f_c = \SI{1}{\kilo\hertz}$, the response shows its cutoff at approximately \SI{1.1}{\kilo\hertz}, resulting in an error of \SI{10}{\percent}. For $f_c = \SI{4}{\kilo\hertz}$, \Cref{subfig:prim-resp-4000} even shows its cutoff frequency at approximately \SI{5.57}{\kilo\hertz} - an error of \SI{39.3}{\percent}.
+The parameter $g$ of the filter coefficients firstly calculated simply by $g = 2 \pi \cdot f_c / f_s$. The filter frequency response using this formula is given in \Cref{fig:prim-resp} for the two different cutoff frequencies. It is clearly visible that the intended cutoff frequencies were not met. In \Cref{fig:prim-resp}, for $f_c = \SI{1}{\kilo\hertz}$, the response shows its cutoff at approximately \SI{1.1}{\kilo\hertz}, resulting in an error of \SI{10}{\percent}. For $f_c = \SI{4}{\kilo\hertz}$, \Cref{fig:prim-resp} even shows its cutoff frequency at approximately \SI{5.57}{\kilo\hertz} - an error of \SI{39.3}{\percent}.
 
 \begin{figure} [!ht]
 	\centering
-	\begin{subfigure}[b]{0.9\textwidth}
-		\centering
-		\includegraphics[width=\textwidth]{primitive-response-1000.eps}
-		\caption{Response for $f_c = \SI{1}{\kilo\hertz}$}
-		\label{subfig:prim-resp-1000}
-	\end{subfigure}
-	\begin{subfigure}[b]{0.9\textwidth}
-		\centering
-		\includegraphics[width=\textwidth]{primitive-response-4000.eps}
-		\caption{Response for $f_c = \SI{4}{\kilo\hertz}$}
-		\label{subfig:prim-resp-4000}
-	\end{subfigure}
+	\includegraphics[width=0.9\textwidth]{primitive-responses.eps}
 	\caption{Filter responses for primitive calculation of parameter $g$}
 	\label{fig:prim-resp}
 \end{figure}
 
-To mitigate the nonlinear relation of $f_c$ to the actual cutoff frequency, a polynomial model for the parameter $g$ is proposed in \cite{Vaelimaeki2006}. The model is given in \Cref{eq:polynom-fit}, where $\omega_c = 2 \pi \cdot f_c / f_s$. The result for the frequency response of the filter is given in \Cref{fig:ext-resp}. The actual cutoff frequency is around \SI{4.12}{\kilo\hertz}, a significantly improved error of only \SI{3}{\percent}. 
+To mitigate the nonlinear relation of $f_c$ to the actual cutoff frequency, a polynomial model for the parameter $g$ is proposed in \cite{Vaelimaeki2006}. The model is given in \Cref{eq:polynom-fit}, where $\omega_c = 2 \pi \cdot f_c / f_s$. The result for the frequency response of the filter is given in \Cref{fig:ext-resp}. For $f_c = \SI{1}{\kilo\hertz}$, the error was reduced to \SI{2}{\percent} (actual cutoff \SI{1.02}{\kilo\hertz}). For $f_c = \SI{4}{\kilo\hertz}$, the real cutoff frequency is around \SI{4.12}{\kilo\hertz}, a significantly improved error of only \SI{3}{\percent}.
 
 \begin{equation}
 	\label{eq:polynom-fit}
@@ -160,14 +156,46 @@ To mitigate the nonlinear relation of $f_c$ to the actual cutoff frequency, a po
 
 \begin{figure}
 	\centering
-	\includegraphics[width=0.9\textwidth]{primitive-response-4000-improved.eps}
-	\caption{Filter response for polynomial fit of parameter $g$ (see \Cref{eq:polynom-fit})}
+	\includegraphics[width=0.9\textwidth]{improved-responses.eps}
+	\caption{Filter responses for polynomial fit of parameter $g$ (see \Cref{eq:polynom-fit})}
 	\label{fig:ext-resp}
 \end{figure}
 
-\section{Methods} \label{sec:methods}
-\section{Results} \label{sec:results}
-\section{Summary and Outlook} \label{sec:summary}
+\section{Fourth-order filter} \label{sec:fourth-order}
+The combination of four first-order filter segments (discussed in \Cref{sec:first-order-fs}) results in a fourth-order filter. The frequency response of this combination is given in \Cref{fig:fourth-order-resp}. At the \SI{-3}{\deci\bel}-frequency of the first-order section, the fourth-order response shows a gain of \SI{-12}{\deci\bel}. This is expected, as four identical filter elements with \SI{-3}{\deci\bel} gain are combined.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\textwidth]{fourthorder-response.eps}
+	\caption{Filter response for four of the first-order sections combined, each using $f_c = \SI{1}{\kilo\hertz}$}
+	\label{fig:fourth-order-resp}
+\end{figure}
+
+\section{Nonlinearity}
+The nonlinear function $\tanh(x)$ is applied to the input before filtering, which is depicted in \Cref{fig:overall-structure}. This introduces signal distrotion. Especially for high amplitudes, the peaks of input sine waves are flattened. In the frequency domain, this effect introduces additional harmonics. For low amplitudes however, the function $\tanh(x)$ is very close to linear and does not introduce significant harmonics.
+
+\section{Feedback}
+The feedback path depicted in \Cref{fig:overall-structure} requires transformation into an equation. Therefore, the equations for the nodes annotated are derived in \Cref{eq:nodes5,eq:nodes6,eq:nodes7}. For the implementation, the parameter $G_{comp}$ is set to a fixed value of $0.5$. An example response is shown in \Cref{fig:feedback-response}, which shows a resonant peak at \SI{870}{\hertz} with a gain of \SI{7.2}{\deci\bel}.
+
+\begin{align}
+	\label{eq:nodes5}
+	J &= y[n-1] & K &= G_{comp} \cdot x[n] \\
+	\label{eq:nodes6}
+	L &= J - K & M &= 4 G_{res} \cdot L
+\end{align}
+	
+\begin{equation}
+	\label{eq:nodes7}
+	N = x[n] - M = x[n] - 4 G_{res} \cdot (y[n-1] - G_{comp} \cdot x[n])
+\end{equation}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\textwidth]{feedback-response.eps}
+	\caption{Filter system response using feedback, first-order segments with $f_c = \SI{1}{\kilo\hertz}$ and $G_{res}=0.75$ (peak gain \SI{7.2}{\deci\bel})}
+	\label{fig:feedback-response}
+\end{figure}
+
 
 \clearpage
 \sloppy
