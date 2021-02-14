@@ -78,11 +78,11 @@
 \pagebreak
 
 \section{Introduction} \label{sec:intro}
-This report discusses the implementation of a digital emulation \cite{Stilson1996} of a Moog voltage-controlled filter. The overall structure of this filter is depicted in \Cref{fig:overall-structure}.
+This report discusses the implementation of a digital emulation \cite{Stilson1996} of a Moog voltage-controlled filter. The overall structure of this filter is depicted in \Cref{fig:overall-structure}. It consists out of four first-order low-pass filters, a simple nonlinear function and a feedback loop.
 
 \begin{figure}
 	\centering
-	\includegraphics[width=\textwidth]{feedback.jpg}
+	\includegraphics[width=0.9\textwidth]{feedback.jpg}
 	\caption{Overall structure of the implemented Moog voltage-controlled filter, adapted from \cite{Vaelimaeki2006}}
 	\label{fig:overall-structure}
 \end{figure}
@@ -131,21 +131,14 @@ The resulting filter coefficients $b_0$, $b_1$ and $a_1$ were then calculated an
 
 \begin{figure}
 	\centering
-	\includegraphics[width=\textwidth]{first-order-section.jpg}
-	\caption{First-order section of the filter depicted in \Cref{fig:overall-structure} \cite{Vaelimaeki2006}}
+	\includegraphics[width=0.8\textwidth]{first-order-section.jpg}
+	\caption{First-order section of the filter depicted in \Cref{fig:overall-structure}, adapted from \cite{Vaelimaeki2006}}
 	\label{fig:first-order-section}
 \end{figure}
 
 \subsection{Performance}
 
 The parameter $g$ of the filter coefficients firstly calculated simply by $g = 2 \pi \cdot f_c / f_s$. The filter frequency response using this formula is given in \Cref{fig:prim-resp} for the two different cutoff frequencies. It is clearly visible that the intended cutoff frequencies were not met. In \Cref{fig:prim-resp}, for $f_c = \SI{1}{\kilo\hertz}$, the response shows its cutoff at approximately \SI{1.1}{\kilo\hertz}, resulting in an error of \SI{10}{\percent}. For $f_c = \SI{4}{\kilo\hertz}$, \Cref{fig:prim-resp} even shows its cutoff frequency at approximately \SI{5.57}{\kilo\hertz} - an error of \SI{39.3}{\percent}.
-
-\begin{figure} [!ht]
-	\centering
-	\includegraphics[width=0.9\textwidth]{primitive-responses.eps}
-	\caption{Filter responses for primitive calculation of parameter $g$}
-	\label{fig:prim-resp}
-\end{figure}
 
 To mitigate the nonlinear relation of $f_c$ to the actual cutoff frequency, a polynomial model for the parameter $g$ is proposed in \cite{Vaelimaeki2006}. The model is given in \Cref{eq:polynom-fit}, where $\omega_c = 2 \pi \cdot f_c / f_s$. The result for the frequency response of the filter is given in \Cref{fig:ext-resp}. For $f_c = \SI{1}{\kilo\hertz}$, the error was reduced to \SI{2}{\percent} (actual cutoff \SI{1.02}{\kilo\hertz}). For $f_c = \SI{4}{\kilo\hertz}$, the real cutoff frequency is around \SI{4.12}{\kilo\hertz}, a significantly improved error of only \SI{3}{\percent}.
 
@@ -154,11 +147,22 @@ To mitigate the nonlinear relation of $f_c$ to the actual cutoff frequency, a po
 	g = 0.9892 \omega_c - 0.4342 \omega_c^2 + 0.1381 \omega_c^3 - 0.0202 \omega_c^4
 \end{equation}
 
-\begin{figure}
+\begin{figure} [!ht]
 	\centering
-	\includegraphics[width=0.9\textwidth]{improved-responses.eps}
-	\caption{Filter responses for polynomial fit of parameter $g$ (see \Cref{eq:polynom-fit})}
-	\label{fig:ext-resp}
+	\begin{subfigure}[b]{0.9\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{primitive-responses.eps}
+		\subcaption{Primitive calculation ($g = 2 \pi \cdot f_c / f_s$)}
+		\label{fig:prim-resp}
+	\end{subfigure}
+	\begin{subfigure}[b]{0.9\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{improved-responses.eps}
+		\subcaption{Polynomial fit (see \Cref{eq:polynom-fit})}
+		\label{fig:ext-resp}
+	\end{subfigure}
+	\caption{Filter responses for different calculations of parameter $g$}
+	\label{fig:g-resp}
 \end{figure}
 
 \section{Fourth-order filter} \label{sec:fourth-order}
@@ -167,7 +171,7 @@ The combination of four first-order filter segments (discussed in \Cref{sec:firs
 \begin{figure}
 	\centering
 	\includegraphics[width=0.9\textwidth]{fourthorder-response.eps}
-	\caption{Filter response for four of the first-order sections combined, each using $f_c = \SI{1}{\kilo\hertz}$}
+	\caption{Filter response for four of the first-order sections combined, each using $f_c = \SI{4}{\kilo\hertz}$}
 	\label{fig:fourth-order-resp}
 \end{figure}
 
@@ -192,12 +196,30 @@ The feedback path depicted in \Cref{fig:overall-structure} requires transformati
 \begin{figure}
 	\centering
 	\includegraphics[width=0.9\textwidth]{feedback-response.eps}
-	\caption{Filter system response using feedback, first-order segments with $f_c = \SI{1}{\kilo\hertz}$ and $G_{res}=0.75$ (peak gain \SI{7.2}{\deci\bel})}
+	\caption{Filter system response using feedback, first-order segments with $f_c = \SI{1}{\kilo\hertz}$ and $G_{res}=0.75$}
 	\label{fig:feedback-response}
 \end{figure}
 
+\section{Adjustable resonance}
+Using the parameter $C_{res} \in [0, 1]$, the resonance peak can be adjusted by using \Cref{eq:gres-polynom} for $G_{res}$ \cite{Vaelimaeki2006}. The resonance frequency can simply be adjusted by re-calculating the first-order filter segments coefficients for a different cutoff frequency.
 
-\clearpage
+\begin{equation}
+	\label{eq:gres-polynom}
+	G_{res} = C_{res} \cdot (1.0029 + 0.0526 \omega_c - 0.0926 \omega_c^2 - 0.0218 \omega_c^3)
+\end{equation}
+
+\section{Experiments}
+As a simple experiment, a sawtooth oscillator with frequency $f=\SI{100}{\hertz}$ and amplitude $A=0.3$ was used as an input to the implemented system (using $C_{res}=0.9$ and $f_c = \SI{2}{\kilo\hertz}$). \Cref{fig:fft-sawtooth-resonance} shows the fast-fourier transformation of this input and the resulting output. The resonant peak is clearly visible at approximately \SI{2}{\kilo\hertz}.
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=0.7\textwidth]{fft-sawtooth-resonance.jpg}
+	\caption{FFT of sawtooth oscillator input with $f=\SI{100}{\hertz}$ and amplitude $A=0.3$ (red) and the resulting output using $C_{res}=0.9$ and $f_c = \SI{2}{\kilo\hertz}$ (blue)}
+	\label{fig:fft-sawtooth-resonance}
+\end{figure}
+
+Additionally, using the same setting, the resonance parameter was maximised to $C_{res}=1$. After turning down the input oscillator amplitude to zero, the system output showed its resonance frequency only for approximately \SI{1}{\second}.
+
 \sloppy
 \printbibliography
 
