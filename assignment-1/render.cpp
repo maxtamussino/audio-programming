@@ -33,8 +33,12 @@ Scope gScope;
 // Oscillator objects
 Wavetable gSineOscillator, gSawtoothOscillator;
 
-// Filter
-FirstOrderFilterIIR filter;
+// Filters
+FirstOrderFilterIIR filters[4];
+
+// Feedback path
+float gGres = 0.75;
+float gLastOutput = 0.0;
 
 // Bode plot generation
 float gBodeFrequencies[BODE_NUMPOINTS];
@@ -74,7 +78,7 @@ bool setup(BelaContext *context, void *userData)
 	
 	// Arguments: name, default value, minimum, maximum, increment
 	// Create sliders for oscillator and filter settings
-	gGuiController.addSlider("Oscillator Frequency", 100, 40, 8000, 0);
+	gGuiController.addSlider("Oscillator Frequency", 500, 40, 8000, 0);
 	gGuiController.addSlider("Oscillator Amplitude", 0.5, 0, 2.0, 0);
 	
 	// Set up the scope
@@ -101,7 +105,7 @@ void render(BelaContext *context, void *userData)
 	if (gBodeActive) {
 		// Override frequency and amplitude
 		oscFrequency = gBodeFrequencies[gBodeFreqIndex];
-		oscAmplitude = 0.5;
+		oscAmplitude = 0.1;
 		
 		// Check if maximum frame fer frequency is reached
 		gBodeFrameCounter++;
@@ -122,28 +126,40 @@ void render(BelaContext *context, void *userData)
 	gSawtoothOscillator.setFrequency(oscFrequency);
 
 	// Calculate new filter coefficients
-	filter.calculate_coefficients(context->audioSampleRate, 4000.0, 0.0);
+	for (unsigned int i = 0; i < 4; i++) {
+		filters[i].calculate_coefficients(context->audioSampleRate, 1000.0, 0.0);
+	}
 	
     for(unsigned int n = 0; n < context->audioFrames; n++) {
     	// Uncomment one line or the other to choose sine or sawtooth oscillator
     	// (or, if you like, add a GUI or hardware control to switch on the fly)
 		float in = oscAmplitude * gSineOscillator.process();
 		// float in = oscAmplitude * gSawtoothOscillator.process();
-            
-        // Apply the filter to the input signal
-		float out = filter.process(in);
+        
+        // Feedback path
+        float out = in - 4 * gGres * (gLastOutput - 0.5 * in);
+        
+        // Apply nonlinearity
+		out = tanhf_neon(out);
+		
+		// Apply the filters
+		for (unsigned int i = 0; i < 4; i++) {
+			out = filters[i].process(out);
+		}
+		
+		gLastOutput = out;
 		
 		// Save bode gain
 		if (gBodeActive) {
 			// Normalise out to fixed input amplitude (0.5)
-			float gain = out * 2;
+			float gain = out * 10;
 			
 			// Absolute value
 			if (gain < 0) {
 				gain = - gain;
 			}
 			
-			// Search for amplitude -> maximum value
+			// Search for amplitude -> save maximum value
 			if (gain > gBodeGains[gBodeFreqIndex]) {
 				gBodeGains[gBodeFreqIndex] = gain;
 			}
