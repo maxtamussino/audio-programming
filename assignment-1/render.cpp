@@ -17,11 +17,15 @@
 #include "Wavetable.h"
 #include "FirstOrderFilterIIR.h"
 
+// Control the creation of data for a bode diagram
 #define BODE_ACTIVATE true
 #define BODE_NUMPOINTS 150
 #define BODE_START 100
 #define BODE_FACTOR 1.03
 #define BODE_RENDERSPERFREQ 200
+
+// Oscillator selection
+#define OSC_SINE 0
 
 // Browser-based GUI to adjust parameters
 Gui gGui;
@@ -37,15 +41,17 @@ Wavetable gSineOscillator, gSawtoothOscillator;
 FirstOrderFilterIIR filters[4];
 
 // Feedback path
-float gGres = 0.75;
+float gGres = 0.0;
 float gLastOutput = 0.0;
 
 // Bode plot generation
+bool gBodeActive = BODE_ACTIVATE;
+#if BODE_ACTIVATE
 float gBodeFrequencies[BODE_NUMPOINTS];
 float gBodeGains[BODE_NUMPOINTS];
 unsigned int gBodeFreqIndex = 0;
-unsigned int gBodeFrameCounter = 0;
-bool gBodeActive = BODE_ACTIVATE;
+unsigned int gBodeRenderCounter = 0;
+#endif
 
 
 bool setup(BelaContext *context, void *userData)
@@ -78,63 +84,104 @@ bool setup(BelaContext *context, void *userData)
 	
 	// Arguments: name, default value, minimum, maximum, increment
 	// Create sliders for oscillator and filter settings
-	gGuiController.addSlider("Oscillator Frequency", 500, 40, 8000, 0);
-	gGuiController.addSlider("Oscillator Amplitude", 0.5, 0, 2.0, 0);
+	gGuiController.addSlider("Oscillator Frequency", 100, 40, 8000, 1);
+	gGuiController.addSlider("Oscillator Amplitude", 0.3, 0, 2.0, 0.1);
+	gGuiController.addSlider("Cutoff frequency", 1000, 100, 5000, 1);
+	gGuiController.addSlider("Resonance", 0.9, 0, 1, 0.01);
 	
 	// Set up the scope
 	gScope.setup(2, context->audioSampleRate);
 	
 	// Set up bode frequencies
+	#if BODE_ACTIVATE
 	gBodeFrequencies[0] = BODE_START;
 	gBodeGains[0] = 0;
 	for (unsigned int i = 1; i < BODE_NUMPOINTS; i++) {
 		gBodeFrequencies[i] = gBodeFrequencies[i - 1] * BODE_FACTOR;
 		gBodeGains[i] = 0;
 	}
+	#endif
 
 	return true;
+}
+
+// Calculate filter coefficients given specifications
+// frequencyHz -- filter frequency in Hertz (needs to be converted to discrete time frequency)
+// resonance -- normalised parameter 0-1 which is related to filter Q
+void calculate_coefficients(float sampleRate, float frequencyHz, float resonance) {
+	// Calculate powers of omega_c
+	float omega_c = 2 * M_PI * frequencyHz / sampleRate;
+	float omega_c2 = omega_c * omega_c;
+	float omega_c3 = omega_c2 * omega_c;
+	float omega_c4 = omega_c3 * omega_c;
+	
+	// Polynomial model for g
+	float g = 0.9892 * omega_c - 0.4342 * omega_c2 + 0.1381 * omega_c3 - 0.0202 * omega_c4;
+	
+	// Polynomial model for G_res
+	gGres = resonance * (1.0029 + 0.0526 * omega_c - 0.0926 * omega_c2 + 0.0218 * omega_c3);
+	
+	// Filter coefficients
+	float coeffB0 = g * 1.0 / 1.3;
+	float coeffB1 = g * 0.3 / 1.3;
+	float coeffA1 = g - 1.0;
+	
+	// Set new coefficients for all filters
+	for (unsigned int i = 0; i < 4; i++) {
+		filters[i].set_coefficients(coeffB0, coeffB1, coeffA1);
+	}
 }
 
 void render(BelaContext *context, void *userData)
 {
 	// Read the slider values
 	float oscFrequency = gGuiController.getSliderValue(0);
-	float oscAmplitude = gGuiController.getSliderValue(1);	
+	float oscAmplitude = gGuiController.getSliderValue(1);
+	float cutoffFrequency = gGuiController.getSliderValue(2);
+	float resonance = gGuiController.getSliderValue(3);
 	
 	// Bode plot frequency selection
+	#if BODE_ACTIVATE
 	if (gBodeActive) {
 		// Override frequency and amplitude
+		// Amplitude low to avoid nonlinearity
 		oscFrequency = gBodeFrequencies[gBodeFreqIndex];
 		oscAmplitude = 0.1;
 		
-		// Check if maximum frame fer frequency is reached
-		gBodeFrameCounter++;
-		if (gBodeFrameCounter == BODE_RENDERSPERFREQ) {
-			gBodeFrameCounter = 0;
+		// Check if maximum render call per frequency is reached
+		gBodeRenderCounter++;
+		if (gBodeRenderCounter == BODE_RENDERSPERFREQ) {
+			gBodeRenderCounter = 0;
+			
+			// New frequency
 			gBodeFreqIndex++;
 			
 			// Check if finished
 			if (gBodeFreqIndex == BODE_NUMPOINTS) {
+				
 				// Stop bode
 				gBodeActive = false;
 			}
 		}
 	}
+	#endif
 
 	// Set the oscillator frequency
 	gSineOscillator.setFrequency(oscFrequency);
 	gSawtoothOscillator.setFrequency(oscFrequency);
 
 	// Calculate new filter coefficients
-	for (unsigned int i = 0; i < 4; i++) {
-		filters[i].calculate_coefficients(context->audioSampleRate, 1000.0, 0.0);
-	}
+	calculate_coefficients(context->audioSampleRate, cutoffFrequency, resonance);
 	
     for(unsigned int n = 0; n < context->audioFrames; n++) {
-    	// Uncomment one line or the other to choose sine or sawtooth oscillator
-    	// (or, if you like, add a GUI or hardware control to switch on the fly)
-		float in = oscAmplitude * gSineOscillator.process();
-		// float in = oscAmplitude * gSawtoothOscillator.process();
+    	
+    	// Choose sine or sawtooth oscillator
+    	float in = oscAmplitude;
+    	if (gBodeActive || OSC_SINE) {
+			in *= gSineOscillator.process();
+		} else {
+			in *= gSawtoothOscillator.process();
+		}
         
         // Feedback path
         float out = in - 4 * gGres * (gLastOutput - 0.5 * in);
@@ -150,8 +197,9 @@ void render(BelaContext *context, void *userData)
 		gLastOutput = out;
 		
 		// Save bode gain
+		#if BODE_ACTIVATE
 		if (gBodeActive) {
-			// Normalise out to fixed input amplitude (0.5)
+			// Normalise out to fixed input amplitude (0.1)
 			float gain = out * 10;
 			
 			// Absolute value
@@ -164,6 +212,7 @@ void render(BelaContext *context, void *userData)
 				gBodeGains[gBodeFreqIndex] = gain;
 			}
 		}
+		#endif
             
         // Write the output to every audio channel
     	for(unsigned int channel = 0; channel < context->audioOutChannels; channel++) {
@@ -177,13 +226,15 @@ void render(BelaContext *context, void *userData)
 void cleanup(BelaContext *context, void *userData)
 {
 	// Print bode result (for matlab)
-	std::cout << "frequencies = [";
-	for (unsigned int i = 0; i < BODE_NUMPOINTS; i++) {
-		std::cout << gBodeFrequencies[i] << ", ";
+	#if BODE_ACTIVATE
+	std::cout << "frequencies = [" << gBodeFrequencies[0];
+	for (unsigned int i = 1; i < BODE_NUMPOINTS; i++) {
+		std::cout << ", " << gBodeFrequencies[i];
 	}
-	std::cout << "]\ngains = [";
-	for (unsigned int i = 0; i < BODE_NUMPOINTS; i++) {
-		std::cout << gBodeGains[i] << ", ";
+	std::cout << "]\ngains = [" << gBodeGains[0];
+	for (unsigned int i = 1; i < BODE_NUMPOINTS; i++) {
+		std::cout << ", " << gBodeGains[i];
 	}
-	std::cout << "]\n";
+	std::cout << "];\n";
+	#endif
 }

@@ -6,7 +6,7 @@ class FirstOrderFilterIIR {
 public:
 	FirstOrderFilterIIR();
 	
-	void calculate_coefficients(float sampleRate, float frequencyHz, float resonance);
+	void set_coefficients(float coeffB0, float coeffB1, float coeffA1);
 	float process(float input);
 	
 	~FirstOrderFilterIIR() {}
