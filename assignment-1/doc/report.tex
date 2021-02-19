@@ -78,9 +78,9 @@
 \pagebreak
 
 \section{Introduction} \label{sec:intro}
-This report discusses the implementation of a digital emulation \cite{Stilson1996} of a Moog voltage-controlled filter. The overall structure of this filter is depicted in \Cref{fig:overall-structure}. It consists out of four first-order low-pass filters, a simple nonlinear function and a feedback loop.
+This report discusses the implementation of a digital emulation \cite{Stilson1996} of a Moog voltage-controlled filter \cite{Moog1965}. The overall structure of this filter is depicted in \Cref{fig:overall-structure}. It consists out of four first-order low-pass filters, a simple nonlinear function and a feedback loop.
 
-\begin{figure}
+\begin{figure}[h!]
 	\centering
 	\includegraphics[width=0.9\textwidth]{feedback.jpg}
 	\caption{Overall structure of the implemented Moog voltage-controlled filter, adapted from \cite{Vaelimaeki2006}}
@@ -138,7 +138,7 @@ The resulting filter coefficients $b_0$, $b_1$ and $a_1$ were then calculated an
 
 \subsection{Performance}
 
-The parameter $g$ of the filter coefficients firstly calculated simply by $g = 2 \pi \cdot f_c / f_s$. The filter frequency response using this formula is given in \Cref{fig:prim-resp} for the two different cutoff frequencies. It is clearly visible that the intended cutoff frequencies were not met. In \Cref{fig:prim-resp}, for $f_c = \SI{1}{\kilo\hertz}$, the response shows its cutoff at approximately \SI{1.1}{\kilo\hertz}, resulting in an error of \SI{10}{\percent}. For $f_c = \SI{4}{\kilo\hertz}$, \Cref{fig:prim-resp} even shows its cutoff frequency at approximately \SI{5.57}{\kilo\hertz} - an error of \SI{39.3}{\percent}.
+The parameter $g$ of the filter coefficients is firstly calculated simply by $g = 2 \pi \cdot f_c / f_s$. The filter frequency response using this formula is given in \Cref{fig:prim-resp} for the two different cutoff frequencies. It is clearly visible that the intended cutoff frequencies were not met accurately. In \Cref{fig:prim-resp}, for $f_c = \SI{1}{\kilo\hertz}$, the response shows its cutoff at approximately \SI{1.1}{\kilo\hertz}, resulting in an error of \SI{10}{\percent}. For $f_c = \SI{4}{\kilo\hertz}$, \Cref{fig:prim-resp} even shows its cutoff frequency at approximately \SI{5.57}{\kilo\hertz} - an error of \SI{39.3}{\percent}.
 
 To mitigate the nonlinear relation of $f_c$ to the actual cutoff frequency, a polynomial model for the parameter $g$ is proposed in \cite{Vaelimaeki2006}. The model is given in \Cref{eq:polynom-fit}, where $\omega_c = 2 \pi \cdot f_c / f_s$. The result for the frequency response of the filter is given in \Cref{fig:ext-resp}. For $f_c = \SI{1}{\kilo\hertz}$, the error was reduced to \SI{2}{\percent} (actual cutoff \SI{1.02}{\kilo\hertz}). For $f_c = \SI{4}{\kilo\hertz}$, the real cutoff frequency is around \SI{4.12}{\kilo\hertz}, a significantly improved error of only \SI{3}{\percent}.
 
@@ -147,7 +147,7 @@ To mitigate the nonlinear relation of $f_c$ to the actual cutoff frequency, a po
 	g = 0.9892 \omega_c - 0.4342 \omega_c^2 + 0.1381 \omega_c^3 - 0.0202 \omega_c^4
 \end{equation}
 
-\begin{figure} [!ht]
+\begin{figure} [!h]
 	\centering
 	\begin{subfigure}[b]{0.9\textwidth}
 		\centering
@@ -168,7 +168,7 @@ To mitigate the nonlinear relation of $f_c$ to the actual cutoff frequency, a po
 \section{Fourth-order filter} \label{sec:fourth-order}
 The combination of four first-order filter segments (discussed in \Cref{sec:first-order-fs}) results in a fourth-order filter. The frequency response of this combination is given in \Cref{fig:fourth-order-resp}. At the \SI{-3}{\deci\bel}-frequency of the first-order section, the fourth-order response shows a gain of \SI{-12}{\deci\bel}. This is expected, as four identical filter elements with \SI{-3}{\deci\bel} gain are combined.
 
-\begin{figure}
+\begin{figure}[!h]
 	\centering
 	\includegraphics[width=0.9\textwidth]{fourthorder-response.eps}
 	\caption{Filter response for four of the first-order sections combined, each using $f_c = \SI{4}{\kilo\hertz}$}
@@ -176,10 +176,10 @@ The combination of four first-order filter segments (discussed in \Cref{sec:firs
 \end{figure}
 
 \section{Nonlinearity}
-The nonlinear function $\tanh(x)$ is applied to the input before filtering, which is depicted in \Cref{fig:overall-structure}. This introduces signal distrotion. Especially for high amplitudes, the peaks of input sine waves are flattened. In the frequency domain, this effect introduces additional harmonics. For low amplitudes however, the function $\tanh(x)$ is very close to linear and does not introduce significant harmonics.
+The nonlinear function $\tanh(x)$ is applied \cite{Huovilainen2004} to the input before filtering, which is depicted in \Cref{fig:overall-structure}. This introduces signal distrotion. Especially for high amplitudes, the peaks of input sine waves are flattened. In the frequency domain, this effect introduces additional harmonics which increase in significance for high input amplitudes. For low amplitudes however, no significant harmonics are introduced. This is due to the shape of the function $\tanh(x)$, which is very close to being linear for low and increasingly nonlinear for high input amplitudes.
 
 \section{Feedback}
-The feedback path depicted in \Cref{fig:overall-structure} requires transformation into an equation. Therefore, the equations for the nodes annotated are derived in \Cref{eq:nodes5,eq:nodes6,eq:nodes7}. For the implementation, the parameter $G_{comp}$ is set to a fixed value of $0.5$. An example response is shown in \Cref{fig:feedback-response}, which shows a resonant peak at \SI{870}{\hertz} with a gain of \SI{7.2}{\deci\bel}.
+The feedback path depicted in \Cref{fig:overall-structure} requires transformation into an equation. Therefore, the equations for the nodes annotated are derived in \Cref{eq:nodes5,eq:nodes6,eq:nodes7}. For the implementation, the parameter $G_{comp}$ is set to a fixed value of $0.5$. An example response for $G_{res}=0.75$ is shown in \Cref{fig:feedback-response}. It shows a resonant peak at \SI{870}{\hertz} with a maximum gain of \SI{7.2}{\deci\bel}.
 
 \begin{align}
 	\label{eq:nodes5}
@@ -196,12 +196,12 @@ The feedback path depicted in \Cref{fig:overall-structure} requires transformati
 \begin{figure}
 	\centering
 	\includegraphics[width=0.9\textwidth]{feedback-response.eps}
-	\caption{Filter system response using feedback, first-order segments with $f_c = \SI{1}{\kilo\hertz}$ and $G_{res}=0.75$}
+	\caption{Filter system frequency response using feedback, first-order segments with $f_c = \SI{1}{\kilo\hertz}$ and $G_{res}=0.75$}
 	\label{fig:feedback-response}
 \end{figure}
 
 \section{Adjustable resonance}
-Using the parameter $C_{res} \in [0, 1]$, the resonance peak can be adjusted by using \Cref{eq:gres-polynom} for $G_{res}$ \cite{Vaelimaeki2006}. The resonance frequency can simply be adjusted by re-calculating the first-order filter segments coefficients for a different cutoff frequency.
+Using the parameter $C_{res} \in [0, 1]$, the resonance peak can be adjusted by using \Cref{eq:gres-polynom} for $G_{res}$ \cite{Vaelimaeki2006}. The resonance frequency can simply be adjusted by re-calculating the first-order filter segments coefficients for a different cutoff frequency. The influence of this parameter is observed in \Cref{subsec:c-adjust}.
 
 \begin{equation}
 	\label{eq:gres-polynom}
@@ -209,7 +209,8 @@ Using the parameter $C_{res} \in [0, 1]$, the resonance peak can be adjusted by 
 \end{equation}
 
 \section{Experiments}
-As a simple experiment, a sawtooth oscillator with frequency $f=\SI{100}{\hertz}$ and amplitude $A=0.3$ was used as an input to the implemented system (using $C_{res}=0.9$ and $f_c = \SI{2}{\kilo\hertz}$). \Cref{fig:fft-sawtooth-resonance} shows the fast-fourier transformation of this input and the resulting output. The resonant peak is clearly visible at approximately \SI{2}{\kilo\hertz}.
+\subsection{Effect on sawtooth spectrum}
+As a simple experiment, a sawtooth oscillator with frequency $f=\SI{100}{\hertz}$ and amplitude $A=0.3$ was used as an input to the implemented system (using $C_{res}=0.9$ and $f_c = \SI{2}{\kilo\hertz}$). \Cref{fig:fft-sawtooth-resonance} shows the Fast Fourier Transformation (FFT) of this input and the resulting output. The resonant peak is clearly visible at approximately \SI{2}{\kilo\hertz}. Changing the resonance frequency is furthermore clearly audible, as this specific frequency of the sawtooths spectrum is especially amplified.
 
 \begin{figure}[h!]
 	\centering
@@ -218,7 +219,18 @@ As a simple experiment, a sawtooth oscillator with frequency $f=\SI{100}{\hertz}
 	\label{fig:fft-sawtooth-resonance}
 \end{figure}
 
-Additionally, using the same setting, the resonance parameter was maximised to $C_{res}=1$. After turning down the input oscillator amplitude to zero, the system output showed its resonance frequency only for approximately \SI{1}{\second}.
+\subsection{Sudden input removal}
+This experiment uses the same setting as before, only the resonance parameter was maximised to $C_{res}=1$. After turning down the input oscillator amplitude to zero, the system output showed only its resonance frequency for approximately \SI{1}{\second}. The high gain at this frequency, combined with feeding back the output to the filters input, results in this behaviour.
+
+\subsection{Resonance adjustment} \label{subsec:c-adjust}
+In the final experiment, a bode plot of the complete system is made for five different values of $C_{res}$. The filter cutoff frequency is set to $f_c = \SI{1}{\kilo\hertz}$. The results are depicted in \Cref{fig:c-adjust}. It is interesting that the parameter $C_{res}$ does not only influence the height of the resonance peak, but also the resonance frequency and the gain for low frequencies.
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=\textwidth]{resonances.eps}
+	\caption{Frequency response of filter system with $f_c = \SI{1}{\kilo\hertz}$ and different values for $C_{res}$}
+	\label{fig:c-adjust}
+\end{figure}
 
 \sloppy
 \printbibliography
