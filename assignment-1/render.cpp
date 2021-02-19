@@ -18,13 +18,14 @@
 #include "FirstOrderFilterIIR.h"
 
 // Control the creation of data for a bode diagram
+// Use BODE_ACTIVATE to toggle the use
 #define BODE_ACTIVATE true
 #define BODE_NUMPOINTS 150
 #define BODE_START 100
 #define BODE_FACTOR 1.03
 #define BODE_RENDERSPERFREQ 200
 
-// Oscillator selection
+// Oscillator selection (1 is sine, 0 is sawtooth)
 #define OSC_SINE 0
 
 // Browser-based GUI to adjust parameters
@@ -40,11 +41,12 @@ Wavetable gSineOscillator, gSawtoothOscillator;
 // Filters
 FirstOrderFilterIIR filters[4];
 
-// Feedback path
+// Feedback path global variables
 float gGres = 0.0;
 float gLastOutput = 0.0;
 
 // Bode plot generation
+// Most of them only used if bode creation needed
 bool gBodeActive = BODE_ACTIVATE;
 #if BODE_ACTIVATE
 float gBodeFrequencies[BODE_NUMPOINTS];
@@ -87,12 +89,12 @@ bool setup(BelaContext *context, void *userData)
 	gGuiController.addSlider("Oscillator Frequency", 100, 40, 8000, 1);
 	gGuiController.addSlider("Oscillator Amplitude", 0.3, 0, 2.0, 0.1);
 	gGuiController.addSlider("Cutoff frequency", 1000, 100, 5000, 1);
-	gGuiController.addSlider("Resonance", 0.9, 0, 1, 0.01);
+	gGuiController.addSlider("Resonance", 0.5, 0, 1, 0.01);
 	
 	// Set up the scope
 	gScope.setup(2, context->audioSampleRate);
 	
-	// Set up bode frequencies
+	// Set up bode frequencies if needed
 	#if BODE_ACTIVATE
 	gBodeFrequencies[0] = BODE_START;
 	gBodeGains[0] = 0;
@@ -110,16 +112,16 @@ bool setup(BelaContext *context, void *userData)
 // resonance -- normalised parameter 0-1 which is related to filter Q
 void calculate_coefficients(float sampleRate, float frequencyHz, float resonance) {
 	// Calculate powers of omega_c
-	float omega_c = 2 * M_PI * frequencyHz / sampleRate;
-	float omega_c2 = omega_c * omega_c;
-	float omega_c3 = omega_c2 * omega_c;
-	float omega_c4 = omega_c3 * omega_c;
+	float omega_c1 = 2 * M_PI * frequencyHz / sampleRate;
+	float omega_c2 = omega_c1 * omega_c1;
+	float omega_c3 = omega_c2 * omega_c1;
+	float omega_c4 = omega_c3 * omega_c1;
 	
 	// Polynomial model for g
-	float g = 0.9892 * omega_c - 0.4342 * omega_c2 + 0.1381 * omega_c3 - 0.0202 * omega_c4;
+	float g = 0.9892 * omega_c1 - 0.4342 * omega_c2 + 0.1381 * omega_c3 - 0.0202 * omega_c4;
 	
 	// Polynomial model for G_res
-	gGres = resonance * (1.0029 + 0.0526 * omega_c - 0.0926 * omega_c2 + 0.0218 * omega_c3);
+	gGres = resonance * (1.0029 + 0.0526 * omega_c1 - 0.0926 * omega_c2 + 0.0218 * omega_c3);
 	
 	// Filter coefficients
 	float coeffB0 = g * 1.0 / 1.3;
@@ -194,9 +196,10 @@ void render(BelaContext *context, void *userData)
 			out = filters[i].process(out);
 		}
 		
+		// Save the state for feedback
 		gLastOutput = out;
 		
-		// Save bode gain
+		// Calculate and save bode gain if needed
 		#if BODE_ACTIVATE
 		if (gBodeActive) {
 			// Normalise out to fixed input amplitude (0.1)
