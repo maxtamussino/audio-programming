@@ -19,7 +19,7 @@
 
 // Control the creation of data for a bode diagram
 // Use BODE_ACTIVATE to toggle the use
-#define BODE_ACTIVATE true
+#define BODE_ACTIVATE false
 #define BODE_NUMPOINTS 150
 #define BODE_START 100
 #define BODE_FACTOR 1.03
