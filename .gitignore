@@ -2,6 +2,9 @@
 .vscode
 build
 
+# Matlab files
+*.asv
+
 # Bibliography aux files
 *.bib.bak
 *.bib.sav
