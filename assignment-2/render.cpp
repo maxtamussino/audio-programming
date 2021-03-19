@@ -7,7 +7,7 @@
  *
  * This code runs on the Bela embedded audio platform (bela.io).
  *
- * Andrew McPherson, Becky Stewart and Victor Zappi
+ * Andrew McPherson, Becky Ste wart and Victor Zappi
  * 2015-2020
  */
 
@@ -15,6 +15,11 @@
 #include <Bela.h>
 #include <cmath>
 #include "drums.h"
+
+#include "button.h"
+#include "potentiometer.h"
+#include "led.h"
+#include "accelerometer.h"
 
 
 /* Variables which are given to you: */
@@ -33,7 +38,8 @@ int gIsPlaying = 0;			/* Whether we should play or not. Implement this in Step 4
  * holding each read pointer, the other saying which buffer
  * each read pointer corresponds to.
  */
-int gReadPointer = 0;
+int gReadPointers[16];
+int gDrumBufferForReadPointer[16];
 
 /* Patterns indicate which drum(s) should play on which beat.
  * Each element of gPatterns is an array, whose length is given
@@ -53,6 +59,7 @@ int gCurrentIndexInPattern = 0;
  * it corresponds to.
  */
 int gEventIntervalMilliseconds = 250;
+int gEventIntervalCounter = 0;
 
 /* This variable indicates whether samples should be triggered or
  * not. It is used in Step 4b, and should be set in gpio.cpp.
@@ -70,6 +77,14 @@ int gShouldPlayFill = 0;
 int gPreviousPattern = 0;
 
 /* TODO: Declare any further global variables you need here */
+Button gButton0(0); // Digital 0
+Button gButton1(1); // Digital 1
+LED gLed(2);        // Digital 2
+Potentiometer gPotentiometer(0);       // Analog  0
+Accelerometer gAccelerometer(1,2,3,3); // Analog  1 (x)
+									   //         2 (y)
+									   //         3 (z)
+									   // Digital 3 (sleep)
 
 // setup() is called once before the audio rendering starts.
 // Use it to perform any initialisation and allocation which is dependent
@@ -82,7 +97,24 @@ int gPreviousPattern = 0;
 
 bool setup(BelaContext *context, void *userData)
 {
-	/* Step 2: initialise GPIO pins */
+	// Set up buttons with 50ms debounce interval
+	gButton0.setup(context, 50);
+	gButton1.setup(context, 50);
+	
+	// Set up LED
+	gLed.setup(context);
+	
+	// Set up potentiometer for 3.3V maximum input
+	gPotentiometer.setup(context, 3.3/4.096);
+	
+	// Set up accelerometer with thresholds
+	gAccelerometer.setup(context, 0.7, 0.9);
+	
+	// Initialise all slots inactive
+	for (int i = 0; i < 16; i++) {
+		gDrumBufferForReadPointer[i] = -1;
+	}
+	
 	return true;
 }
 
@@ -93,24 +125,85 @@ bool setup(BelaContext *context, void *userData)
 
 void render(BelaContext *context, void *userData)
 {
-	/* TODO: your audio processing code goes here! */
-
-	/* Step 2: use gReadPointer to play a drum sound */
-
-	/* Step 3: use multiple read pointers to play multiple drums */
-
-	/* Step 4: count samples and decide when to trigger the next event */
+	for(unsigned int n = 0; n < context->audioFrames; n++) {
+		// Initialise output
+		float out = 0;
+		
+		// Read inputs and react
+    	gButton0.process(context, n);
+    	gButton1.process(context, n);
+    	gLed.process(context, n);
+    	gPotentiometer.process(context, n);
+    	gAccelerometer.process(context, n);
+    	
+    	// Start/stop playing when button0 is pressed
+    	if (gButton0.pressed_now()) {
+    		if (gIsPlaying) {
+    			gIsPlaying = 0;
+    		} else {
+    			gIsPlaying = 1;
+    			gEventIntervalCounter = 0;
+    		}
+    	}
+    	
+    	if (gButton1.pressed_now()) {
+    		gAccelerometer.calibrate(context, n);
+    	}
+    	
+    	// Determine speed from potentiometer (output mapped to 50-1000ms and converted to samples)
+    	int nextEventIntervalSamples = (int)(gPotentiometer.get_value(50, 1000) * context->digitalSampleRate / 1000);
+    	
+    	// If currently playing, count towards next event
+    	if (gIsPlaying) {
+			if (gEventIntervalCounter == 0) {
+				startNextEvent();
+				gLed.flash(context, n, 2); // Flash LED for 2ms
+				gEventIntervalCounter = nextEventIntervalSamples;
+			}
+			gEventIntervalCounter--;
+    	}
+		
+		// Play active samples
+		for (int i = 0; i < 16; i++) {
+			if (gDrumBufferForReadPointer[i] != -1) {
+				if (gReadPointers[i] < gDrumSampleBufferLengths[i]) {
+					out += gDrumSampleBuffers[gDrumBufferForReadPointer[i]][gReadPointers[i]];
+					gReadPointers[i]++;
+				} else {
+					gDrumBufferForReadPointer[i] = -1;
+				}
+			}
+		}
+    	
+        // Write the output to every audio channel
+    	for(unsigned int channel = 0; channel < context->audioOutChannels; channel++) {
+    		audioWrite(context, n, channel, out);
+    	}
+    }
 }
 
 /* Start playing a particular drum sound given by drumIndex.
  */
 void startPlayingDrum(int drumIndex) {
-	/* TODO in Steps 3a and 3b */
+	for (int i = 0; i < 16; i++) {
+		if (gDrumBufferForReadPointer[i] == -1) {
+			gDrumBufferForReadPointer[i] = drumIndex;
+			gReadPointers[i] = 0;
+			return;
+		}
+	}
+	rt_printf("No slot available\n");
 }
 
 /* Start playing the next event in the pattern */
 void startNextEvent() {
-	/* TODO in Step 4 */
+	int event = gPatterns[gCurrentPattern][gCurrentIndexInPattern];
+	for (int i = 0; i < NUMBER_OF_DRUMS; i++) {
+		if (eventContainsDrum(event, i)) startPlayingDrum(i);
+	}
+	if (++gCurrentIndexInPattern == gPatternLengths[gCurrentPattern]) {
+		gCurrentIndexInPattern = 0;
+	}
 }
 
 /* Returns whether the given event contains the given drum sound */
@@ -125,5 +218,5 @@ int eventContainsDrum(int event, int drum) {
 
 void cleanup(BelaContext *context, void *userData)
 {
-
+	
 }
