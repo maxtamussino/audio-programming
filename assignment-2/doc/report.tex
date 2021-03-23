@@ -1,0 +1,86 @@
+\documentclass[a4paper, 12pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}  % ngerman for German
+\usepackage{lmodern}  % nicer font
+\usepackage{geometry}
+\geometry{%
+	left   = 2.5cm,
+	right  = 2.5cm,
+	top    = 3cm,
+	bottom = 3cm
+}
+
+\usepackage{textcomp}
+\usepackage{gensymb}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{nicefrac}  % nicer inline fractions
+\usepackage{tensor}  % allows fancy indices
+\usepackage{siunitx}  % easy handling of value + unit (e.g. \SI{10}{\pF})
+% \sisetup{}  % configure siunitx (e.g. locale = DE)
+\sisetup{output-complex-root=\ensuremath{\mathrm{j}}, complex-root-position = before-number} % configures SI format 10 + j5 for complex numbers (instead of 10 + 5i)
+
+\usepackage{listings}  % code listings
+\usepackage{enumerate}
+\usepackage{booktabs}  % nicer tables (e.g. \toprule)
+\usepackage{verbatim}  % inline code (\verb||)
+\usepackage{subcaption}  % captions for subplots
+\usepackage[european, siunitx, RPvoltages]{circuitikz}  % draw circuit diagrams
+\usepackage{enumitem}
+\setlist[itemize]{label=\rule[0.5ex]{0.6ex}{0.6ex}} % black squares for itemize
+
+\usepackage{pstool}  %% Tex fonts in EPS files
+\usepackage{graphicx}
+\graphicspath{{./figures/}}
+
+\usepackage{etoolbox} % Needed for AtBeginEnvironment command (appendix handling)
+\usepackage{appendix} % Appendices environment
+
+\usepackage{csquotes} % removes biber warning
+\usepackage[  % ieee style citations (e.g. [1])
+	backend     = biber,
+	maxbibnames = 99,
+	autocite    = footnote,
+	style	    = ieee,
+	citestyle   = numeric-comp,
+	doi=false, isbn=false
+]{biblatex}
+\addbibresource{bibliography/bibliography.bib}
+
+\usepackage[nobiblatex]{xurl}  % line breaks in URLs
+% last imports
+\usepackage[bookmarksopen,colorlinks,citecolor=black,linkcolor=black, urlcolor = black]{hyperref}
+
+% after hyperref! 
+\usepackage[noabbrev, nameinlink]{cleveref} 
+% e.g. \cref{label} or \Cref(label) for capital letter
+% configure cleveref not to use brackets around equation references
+\creflabelformat{equation}{#2\textup{#1}#3} % Equation references without parentheses
+\AtBeginEnvironment{appendices}{\crefalias{section}{appendix}} % Appendix referencing (for cref "Appendix A" instead of "Section A")
+
+
+% add missing hyphenations
+\hyphenation{im-ple-men-ta-tions}
+
+\title{ECS7012P - Music and Audio Programming\\
+	   Assignment 2: Drum Machine}
+\author{
+  Max Tamussino, 200579179
+}
+\date{\today}
+
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\pagebreak
+
+\section{Introduction} \label{sec:intro}
+
+
+\sloppy
+\printbibliography
+
+\end{document}
