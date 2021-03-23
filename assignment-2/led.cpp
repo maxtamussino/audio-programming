@@ -1,11 +1,11 @@
-/***** led.cpp *****/
+/***** Led.cpp *****/
 /* Class implementation of a LED
  *
  * ECS7012P - Queen Mary University of London
  * Assignment 2, Max Tamussino
  */
 
-#include "led.h"
+#include "Led.h"
 #include <Bela.h>
 #include <cmath>
 

@@ -16,10 +16,12 @@
 #include <cmath>
 #include "drums.h"
 
-#include "button.h"
-#include "potentiometer.h"
-#include "led.h"
-#include "accelerometer.h"
+#include "Button.h"
+#include "Potentiometer.h"
+#include "Led.h"
+#include "Accelerometer.h"
+
+#include "Filter.h"
 
 
 /* Variables which are given to you: */
@@ -38,8 +40,9 @@ int gIsPlaying = 0;			/* Whether we should play or not. Implement this in Step 4
  * holding each read pointer, the other saying which buffer
  * each read pointer corresponds to.
  */
-int gReadPointers[16];
-int gDrumBufferForReadPointer[16];
+const unsigned int kNumConcurrentSamples = 16;
+int gReadPointers[kNumConcurrentSamples];
+int gDrumBufferForReadPointer[kNumConcurrentSamples];
 
 /* Patterns indicate which drum(s) should play on which beat.
  * Each element of gPatterns is an array, whose length is given
@@ -86,6 +89,7 @@ Accelerometer gAccelerometer(1,2,3,3); // Analog  1 (x)
 									   //         3 (z)
 									   // Digital 3 (sleep)
 
+
 // setup() is called once before the audio rendering starts.
 // Use it to perform any initialisation and allocation which is dependent
 // on the period size or sample rate.
@@ -101,17 +105,13 @@ bool setup(BelaContext *context, void *userData)
 	gButton0.setup(context, 50);
 	gButton1.setup(context, 50);
 	
-	// Set up LED
+	// Set up LED, potentiometer and accelerometer
 	gLed.setup(context);
-	
-	// Set up potentiometer for 3.3V maximum input
-	gPotentiometer.setup(context, 3.3/4.096);
-	
-	// Set up accelerometer with thresholds
-	gAccelerometer.setup(context, 0.7, 0.9);
+	gPotentiometer.setup(context);
+	gAccelerometer.setup(context);
 	
 	// Initialise all slots inactive
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < kNumConcurrentSamples; i++) {
 		gDrumBufferForReadPointer[i] = -1;
 	}
 	
@@ -146,12 +146,51 @@ void render(BelaContext *context, void *userData)
     		}
     	}
     	
-    	if (gButton1.pressed_now()) {
-    		gAccelerometer.calibrate(context, n);
-    	}
+    	// Calibrate accelerometer when button1 is pressed
+    	if (gButton1.pressed_now()) gAccelerometer.calibrate();
     	
     	// Determine speed from potentiometer (output mapped to 50-1000ms and converted to samples)
     	int nextEventIntervalSamples = (int)(gPotentiometer.get_value(50, 1000) * context->digitalSampleRate / 1000);
+    	
+    	// Check for taps on the accelerometer
+    	if (gAccelerometer.tap_detected_now() && !gShouldPlayFill){
+    		gShouldPlayFill = 1;
+    		gPreviousPattern = gCurrentPattern;
+    		gCurrentPattern = FILL_PATTERN;
+    		gCurrentIndexInPattern = 0;
+    	}
+    	
+    	// Change sample if accelerometer is turned
+    	if (gAccelerometer.new_state_now()) {
+    		Accelerometer::status_e acc_state = gAccelerometer.get_status();
+    		gPlaysBackwards = 0;
+    		
+    		// Choose pattern depending on orientation
+    		switch (acc_state) {
+    			case Accelerometer::over:
+    				gPlaysBackwards = 1;
+    				break;
+    			case Accelerometer::flat:
+    				gCurrentPattern = 0;
+    				break;
+    			case Accelerometer::left:
+    				gCurrentPattern = 1;
+    				break;
+    			case Accelerometer::right:
+    				gCurrentPattern = 2;
+    				break;
+    			case Accelerometer::front:
+    				gCurrentPattern = 3;
+    				break;
+    			case Accelerometer::back:
+    				gCurrentPattern = 4;
+    				break;
+    			case Accelerometer::intermediate:
+    				// Nothing happens here
+    				break;
+    		}
+    		gCurrentIndexInPattern %= gPatternLengths[gCurrentPattern];
+    	}
     	
     	// If currently playing, count towards next event
     	if (gIsPlaying) {
@@ -164,16 +203,22 @@ void render(BelaContext *context, void *userData)
     	}
 		
 		// Play active samples
-		for (int i = 0; i < 16; i++) {
-			if (gDrumBufferForReadPointer[i] != -1) {
-				if (gReadPointers[i] < gDrumSampleBufferLengths[i]) {
-					out += gDrumSampleBuffers[gDrumBufferForReadPointer[i]][gReadPointers[i]];
-					gReadPointers[i]++;
-				} else {
-					gDrumBufferForReadPointer[i] = -1;
-				}
+		for (int i = 0; i < kNumConcurrentSamples; i++) {
+			// Check if buffer is empty
+			if (gDrumBufferForReadPointer[i] == -1) continue;
+			
+			if (gReadPointers[i] < gDrumSampleBufferLengths[gDrumBufferForReadPointer[i]]) {
+				// Readpointer still in valid range
+				out += gDrumSampleBuffers[gDrumBufferForReadPointer[i]][gReadPointers[i]];
+				gReadPointers[i]++;
+			} else {
+				// Readpointer reched end
+				gDrumBufferForReadPointer[i] = -1;
 			}
 		}
+		
+		// Rescale output to avoid clipping
+		out *= 0.5;
     	
         // Write the output to every audio channel
     	for(unsigned int channel = 0; channel < context->audioOutChannels; channel++) {
@@ -185,25 +230,56 @@ void render(BelaContext *context, void *userData)
 /* Start playing a particular drum sound given by drumIndex.
  */
 void startPlayingDrum(int drumIndex) {
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < kNumConcurrentSamples; i++) {
 		if (gDrumBufferForReadPointer[i] == -1) {
 			gDrumBufferForReadPointer[i] = drumIndex;
 			gReadPointers[i] = 0;
 			return;
 		}
 	}
-	rt_printf("No slot available\n");
 }
 
 /* Start playing the next event in the pattern */
 void startNextEvent() {
+	// Get event and play its drums
 	int event = gPatterns[gCurrentPattern][gCurrentIndexInPattern];
 	for (int i = 0; i < NUMBER_OF_DRUMS; i++) {
 		if (eventContainsDrum(event, i)) startPlayingDrum(i);
 	}
-	if (++gCurrentIndexInPattern == gPatternLengths[gCurrentPattern]) {
-		gCurrentIndexInPattern = 0;
+	
+	// If accelerometer has entered new state during fill pattern,
+	// gShouldPlayFill must be reset
+	if (gCurrentPattern != FILL_PATTERN && gShouldPlayFill) {
+		gShouldPlayFill = 0;
 	}
+	
+	// In- or decrease index in pattern and reset at ends
+	if (gPlaysBackwards) {
+		if (gCurrentIndexInPattern == 0) {
+			gCurrentIndexInPattern = gPatternLengths[gCurrentPattern];
+			// If it was the fill pattern, reset current pattern
+			if (gCurrentPattern == FILL_PATTERN) {
+				gCurrentPattern = gPreviousPattern;
+				gShouldPlayFill = 0;
+			}
+		}
+		gCurrentIndexInPattern--;
+	} else {
+		gCurrentIndexInPattern++;
+		if (gCurrentIndexInPattern == gPatternLengths[gCurrentPattern]) {
+			gCurrentIndexInPattern = 0;
+			// If it was the fill pattern, reset current pattern
+			if (gCurrentPattern == FILL_PATTERN) {
+				gCurrentPattern = gPreviousPattern;
+				gShouldPlayFill = 0;
+			}
+		}
+	}
+	
+	/*
+	rt_printf("Next frame -> Pattern %d/%d, Length %d", gCurrentPattern, NUMBER_OF_PATTERNS, gPatternLengths[gCurrentPattern]);
+	rt_printf(", Index: %d\n", gCurrentIndexInPattern);
+	*/
 }
 
 /* Returns whether the given event contains the given drum sound */

@@ -1,4 +1,4 @@
-/***** potentiometer.h *****/
+/***** Potentiometer.h *****/
 /* Class implementation of a potentiometer
  *
  * ECS7012P - Queen Mary University of London
@@ -14,7 +14,7 @@ public:
 	Potentiometer(int analog_pin);
 	
 	// Setup
-	void setup(BelaContext *context, float input_max);
+	void setup(BelaContext *context);
 	
 	// To be called once for each frame
 	void process(BelaContext *context, int frame);
@@ -29,7 +29,7 @@ private:
 	// Info
 	int pin;
 	bool setup_done = false;
-	float value, input_max;
+	float value;
 	
 	// Frame handling
 	int audioFramesPerAnalogFrame;

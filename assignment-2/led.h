@@ -1,4 +1,4 @@
-/***** led.h *****/
+/***** Led.h *****/
 /* Class implementation of a LED
  *
  * ECS7012P - Queen Mary University of London

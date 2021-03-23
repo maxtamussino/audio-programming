@@ -1,11 +1,11 @@
-/***** button.cpp *****/
+/***** Button.cpp *****/
 /* Class implementation of a button
  *
  * ECS7012P - Queen Mary University of London
  * Assignment 2, Max Tamussino
  */
 
-#include "button.h"
+#include "Button.h"
 #include <Bela.h>
 #include <cmath>
 
