@@ -91,8 +91,8 @@ void Accelerometer::process(BelaContext *context, int frame) {
 		
 		downsample_counter--;
 		
-		//scope.log(accelerations_raw[2], accelerations_smooth[2], accelerations_filtered[2]);
-		scope.log(accelerations_filtered[0], accelerations_filtered[1], accelerations_filtered[2]);
+		scope.log(accelerations_raw[2], accelerations_smooth[2], accelerations_filtered[2]);
+		//scope.log(accelerations_filtered[0], accelerations_filtered[1], accelerations_filtered[2]);
 	}
 }
 

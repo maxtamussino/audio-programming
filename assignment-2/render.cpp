@@ -207,14 +207,26 @@ void render(BelaContext *context, void *userData)
 			// Check if buffer is empty
 			if (gDrumBufferForReadPointer[i] == -1) continue;
 			
-			if (gReadPointers[i] < gDrumSampleBufferLengths[gDrumBufferForReadPointer[i]]) {
-				// Readpointer still in valid range
-				out += gDrumSampleBuffers[gDrumBufferForReadPointer[i]][gReadPointers[i]];
-				gReadPointers[i]++;
+			// Check if end is reached
+			bool reached_end;
+			if (!gPlaysBackwards) {
+				// Forwards end check
+				reached_end = gReadPointers[i] >= gDrumSampleBufferLengths[gDrumBufferForReadPointer[i]];
 			} else {
-				// Readpointer reched end
-				gDrumBufferForReadPointer[i] = -1;
+				// Backwards end check
+				reached_end = gReadPointers[i] < 0;
 			}
+			if (reached_end) {
+				// Deactivate this read pointer
+				gDrumBufferForReadPointer[i] = -1;
+				continue;
+			}
+			
+			// Get output
+			out += gDrumSampleBuffers[gDrumBufferForReadPointer[i]][gReadPointers[i]];
+			
+			// In/decrease read pointer
+			if (gPlaysBackwards) gReadPointers[i]--; else gReadPointers[i]++;
 		}
 		
 		// Rescale output to avoid clipping
@@ -227,13 +239,16 @@ void render(BelaContext *context, void *userData)
     }
 }
 
-/* Start playing a particular drum sound given by drumIndex.
- */
+/* Start playing a particular drum sound given by drumIndex. */
 void startPlayingDrum(int drumIndex) {
 	for (int i = 0; i < kNumConcurrentSamples; i++) {
 		if (gDrumBufferForReadPointer[i] == -1) {
 			gDrumBufferForReadPointer[i] = drumIndex;
-			gReadPointers[i] = 0;
+			if (gPlaysBackwards) {
+				gReadPointers[i] = gDrumSampleBufferLengths[drumIndex] - 1;
+			} else {
+				gReadPointers[i] = 0;
+			}
 			return;
 		}
 	}
@@ -253,33 +268,16 @@ void startNextEvent() {
 		gShouldPlayFill = 0;
 	}
 	
-	// In- or decrease index in pattern and reset at ends
-	if (gPlaysBackwards) {
-		if (gCurrentIndexInPattern == 0) {
-			gCurrentIndexInPattern = gPatternLengths[gCurrentPattern];
-			// If it was the fill pattern, reset current pattern
-			if (gCurrentPattern == FILL_PATTERN) {
-				gCurrentPattern = gPreviousPattern;
-				gShouldPlayFill = 0;
-			}
-		}
-		gCurrentIndexInPattern--;
-	} else {
-		gCurrentIndexInPattern++;
-		if (gCurrentIndexInPattern == gPatternLengths[gCurrentPattern]) {
-			gCurrentIndexInPattern = 0;
-			// If it was the fill pattern, reset current pattern
-			if (gCurrentPattern == FILL_PATTERN) {
-				gCurrentPattern = gPreviousPattern;
-				gShouldPlayFill = 0;
-			}
+	// Increase index in pattern and reset at the end
+	if (gCurrentIndexInPattern == gPatternLengths[gCurrentPattern]) {
+		gCurrentIndexInPattern = 0;
+		// If it was the fill pattern, reset to previous pattern
+		if (gCurrentPattern == FILL_PATTERN) {
+			gCurrentPattern = gPreviousPattern;
+			gShouldPlayFill = 0;
 		}
 	}
-	
-	/*
-	rt_printf("Next frame -> Pattern %d/%d, Length %d", gCurrentPattern, NUMBER_OF_PATTERNS, gPatternLengths[gCurrentPattern]);
-	rt_printf(", Index: %d\n", gCurrentIndexInPattern);
-	*/
+	gCurrentIndexInPattern++;
 }
 
 /* Returns whether the given event contains the given drum sound */
