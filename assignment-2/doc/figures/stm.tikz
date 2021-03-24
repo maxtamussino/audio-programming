@@ -1,0 +1,52 @@
+\begin{tikzpicture}
+	\begin{pgfonlayer}{nodelayer}
+		\node [style=Box] (1) at (-5.5, 6) {Flat};
+		\node [style=Box] (2) at (5.5, 6) {Over};
+		\node [style=Box] (3) at (-8, 0) {Left};
+		\node [style=Box] (4) at (8, 0) {Right};
+		\node [style=Box] (5) at (5.5, -6) {Back};
+		\node [style=Box] (6) at (-5.5, -6) {Front};
+		\node [style=none] (7) at (-6.25, 1.25) {$a_x < -t_{enter}$};
+		\node [style=none] (8) at (-6.25, -1.25) {$a_x > -t_{exit}$};
+		\node [style=none] (9) at (6.25, 1.25) {$a_x > t_{enter}$};
+		\node [style=none] (10) at (6.25, -1.25) {$a_x < t_{exit}$};
+		\node [style=Medium Box] (11) at (0, 0) {Intermediate};
+		\node [style=none] (12) at (3, -0.5) {};
+		\node [style=none] (13) at (3, 0.5) {};
+		\node [style=none] (14) at (-3, 0.5) {};
+		\node [style=none] (15) at (-3, -0.5) {};
+		\node [style=none] (16) at (2, -1) {};
+		\node [style=none] (17) at (1, -1) {};
+		\node [style=none] (18) at (-1, -1) {};
+		\node [style=none] (19) at (-2, -1) {};
+		\node [style=none] (20) at (-2, 1) {};
+		\node [style=none] (21) at (-1, 1) {};
+		\node [style=none] (22) at (1, 1) {};
+		\node [style=none] (23) at (2, 1) {};
+		\node [style=none] (24) at (-7.25, 4) {$a_z > t_{enter}$};
+		\node [style=none] (25) at (7.25, 4) {$a_z < -t_{enter}$};
+		\node [style=none] (26) at (2.25, 5.75) {$a_z > -t_{exit}$};
+		\node [style=none] (27) at (-2.25, 5.75) {$a_z < t_{exit}$};
+		\node [style=none] (28) at (-7.25, -4) {$a_y < -t_{enter}$};
+		\node [style=none] (29) at (-2.25, -5.75) {$a_y > -t_{exit}$};
+		\node [style=none] (30) at (2.25, -5.75) {$a_y > t_{enter}$};
+		\node [style=none] (31) at (7.25, -4) {$a_y < t_{exit}$};
+		\node [style=STM Start] (32) at (0, 4) {};
+		\node [style=none] (33) at (0, 1) {};
+	\end{pgfonlayer}
+	\begin{pgfonlayer}{edgelayer}
+		\draw [style=Arrow, bend left=15] (13.center) to (4);
+		\draw [style=Arrow, bend left=345] (14.center) to (3);
+		\draw [style=Arrow, bend right=15] (3) to (15.center);
+		\draw [style=Arrow, bend right] (19.center) to (6);
+		\draw [style=Arrow, bend right] (6) to (18.center);
+		\draw [style=Arrow, bend left] (5) to (17.center);
+		\draw [style=Arrow, bend left] (16.center) to (5);
+		\draw [style=Arrow, bend right] (2) to (22.center);
+		\draw [style=Arrow, bend left] (1) to (21.center);
+		\draw [style=Arrow, bend left] (20.center) to (1);
+		\draw [style=Arrow, bend right] (23.center) to (2);
+		\draw [style=Arrow, bend left=15] (4) to (12.center);
+		\draw [style=Arrow] (32) to (33.center);
+	\end{pgfonlayer}
+\end{tikzpicture}
