@@ -1,6 +1,7 @@
-# VScode folders
+# Additional
 .vscode
 build
+*-converted-to.*
 
 # Matlab files
 *.asv
