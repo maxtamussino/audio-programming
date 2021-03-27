@@ -88,10 +88,20 @@ This report covers the implementation of a simple drum machine using the Bela Pl
 \end{figure}
 
 \section{User Interface}
-A potentiometer is used to adjust the speed of the playing drum pattern. This does not affect the speed of individual samples, but the time between them. It may be adjusted to be bewteen \SIrange{50}{1000}{\milli\second} using the full range of the potentiometer. Moreover, a LED lights up for \SI{2}{\milli\second} on each beat. One button makes the drum machine start and stop playing, another button is used to calibrate the accelerometer as described in \Cref{sec:calibration}. The use of the accelerometer to select drum patterns is described in the following Section.
+A potentiometer is used to adjust the speed of the playing drum pattern. This does not affect the speed of individual samples, but the time between them. It may be adjusted to be bewteen \SIrange{50}{1000}{\milli\second} using the full range of the potentiometer. Moreover, a LED lights up for \SI{2}{\milli\second} on each beat. One button makes the drum machine start and stop playing, another button is used to calibrate the accelerometer as described in \Cref{sec:calibration}. The accelerometer is used to select drum patterns: There are the positions flat, left, right, up and down which select one specific drum pattern each. This means the user has to turn the accelerometer \SI{90}{\degree} to select another pattern. Additionally, if the accelerometer is flipped upside down, the samples of the current pattern are played backwards.
+
+\section{Buttons}
+The buttons were debounced using a state machine for each button. If the button is pressed (or released), the state machine transitions into an intermediate bouncing state, in which consecutive bouncing button presses (and releases) are not recorded. At the frame, in which the changing input was detected, an event flag is set which is cleared in the next frame. After a specific time period $t_d$, the state machine transitions into the normal pressed (or released) state, in which further inputs are recorded again. The parameter $t_d$ is selected to be \SI{50}{\milli\second}, which has proven to be sufficient to suppress all unwanted press and release events. In \Cref{fig:button-stm}, the state transition diagram of this mechanism is shown.
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=0.6\textwidth]{button_stm.png}
+	\caption{The state machine used to debounce the buttons}
+	\label{fig:button-stm}
+\end{figure}
 
 \section{Accelerometer}
-The accelerometer was mounted above the Bela board so that it could be moved into different orientations by hand, allowing control of the drum machine. The used sensor \emph{MMA7361} \cite{Freescale2008} has three analog outputs, each representing acceleration in one axis. Each of those channels shows a voltage $V_{off} \approx \SI{1.65}{\volt}$ when \SI{0}{\gram} is measured in its axis. In the selected measurement range of $\pm \SI{1.5}{\gram}$, the sensitivity is given by $S_{1.5g} \approx \SI{800}{\milli\volt\per\gram}$. These values were however discovered to be quite different for each channel, which is why it has to be calibrated upon powerup. 
+The accelerometer is mounted above the Bela board so that it could be moved into different orientations by hand, allowing control of the drum machine. The used sensor \emph{MMA7361} \cite{Freescale2008} has three analog outputs, each representing acceleration in one axis. Each of those channels shows a voltage $V_{off} \approx \SI{1.65}{\volt}$ when \SI{0}{\gram} is measured in its axis. In the selected measurement range of $\pm \SI{1.5}{\gram}$, the sensitivity is given by $S_{1.5g} \approx \SI{800}{\milli\volt\per\gram}$. These values were however discovered to be quite different for each channel, which is why it has to be calibrated upon powerup. 
 
 \subsection{Calibration} \label{sec:calibration}
 To obtain both $V_{off}$ and $S_{1.5g}$ for all three channels, the accelerometer has to be put into three orientations. More advanced calibration techniques use many more orientations \cite{Sipos2012}, however these are unfeasible for this project. Each of the three orientations should measure \SI{+1}{\gram} in one and \SI{0}{\gram} in both other directions. This assumes ideal linearity of the sensor, as only two measurements are conducted per axis ($V_{0g}$ and $V_{1g}$). Although there are actually two measurements for $V_{0g}$ per axis using this method, only the last value is used. Calculating the mean of both values did not noticably improve the results. The order of the used orientations does not matter: Assuming one axis measures \SI{+1}{\gram} and the others \SI{0}{\gram}, the intended position can be derived. The latter measurement directly yields $V_{0g} = V_{off}$ for its channels, while the measurement of $V_{1g}$ is used to calculate $S_{1.5g}$ by
@@ -113,7 +123,7 @@ or (as it is implemented) directly by
 \end{equation}
 
 \subsection{Filters}
-The output of the sensor was measured using the standard Bela analog sampling rate of \SI{22.05}{\kilo\hertz}. To reduce measurement noise and other influences like shaking of the controlling hand, this signal was filtered. A lowpass filter with a very low cutoff frequency is required to detect only changes in the steady-state orientation. At this high sampling rate a sufficiently low cutoff frequency is difficult to realise. FIR filters need to be of order $N>2000$ and IIR filters often become instable after transitioning to single-precision floating point calculations due to truncation errors \cite{Harris1998}. This is why initially only a simple first-order IIR lowpass was used to remove measurement noise. The resulting smoother signal was sampled down by the factor $32$. This allowed the second stage lowpass filter to also consist of only one first-order IIR lowpass. The resulting signal was stable enough to be used to determine the current orientation state of the accelerometer. \Cref{fig:filtering} shows the $z$-axis acceleration transitioning from \SI{1}{\gram} to \SI{0}{\gram} in \SI{400}{\milli\second}. Both filters clearly show introduced latency.
+The output of the sensor is measured using the standard Bela analog sampling rate of \SI{22.05}{\kilo\hertz}. To reduce measurement noise and other influences like shaking of the controlling hand, this signal is filtered. A lowpass filter with a very low cutoff frequency is required to detect only changes in the steady-state orientation. At this high sampling rate a sufficiently low cutoff frequency is difficult to realise. FIR filters need to be of order $N>2000$ and IIR filters often become instable after transitioning to single-precision floating point calculations due to truncation errors \cite{Harris1998}. This is why initially only a simple first-order IIR lowpass was used to remove measurement noise. The resulting smoother signal is sampled down by the factor $32$. This allowed the second stage lowpass filter to also consist of only one first-order IIR lowpass. The resulting signal is stable enough to be used to determine the current orientation state of the accelerometer. \Cref{fig:filtering} shows the $z$-axis acceleration transitioning from \SI{1}{\gram} to \SI{0}{\gram} in \SI{400}{\milli\second}. Both filters clearly show introduced latency.
 
 \begin{figure}[h!]
 	\centering
@@ -131,20 +141,24 @@ Firstly, the measured acceleration values are examined for steadyness. If
 
 the sample is considered unsteady and is discarded. This is because in this case additional acceleration components other than gravity are involved.
 
-Otherwise, the current orientation of the calibrated accelerometer is determined using a state machine, which is depicted in \Cref{fig:stm}. Hysteresis was used to avoid bouncing between two states: A high threshold $t_{enter} = \SI{0.8}{\gram}$ and a low threshold $t_{exit} = \SI{0.6}{\gram}$ is defined. Starting in the intermediate state, it is checked whether any axis experiences acceleration by more than $t_{enter}$. If so, The according state is entered and only left again if the according acceleration falls below the lower $t_{exit}$.
+Otherwise, the current orientation of the calibrated accelerometer is determined using a state machine, which is depicted in \Cref{fig:accel-stm}. Hysteresis is used to avoid bouncing between two states: A high threshold $t_{enter} = \SI{0.8}{\gram}$ and a low threshold $t_{exit} = \SI{0.6}{\gram}$ is defined. Starting in the intermediate state, it is checked whether any axis experiences acceleration by more than $t_{enter}$. If so, The according state is entered and only left again if the according acceleration falls below the lower $t_{exit}$.
 
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=0.65\textwidth]{stm.png}
+	\includegraphics[width=0.65\textwidth]{accel_stm.png}
 	\caption{State machine to determine accelerometer orientation state}
-	\label{fig:stm}
+	\label{fig:accel-stm}
 \end{figure}
 
 Because the state machine enters a state before the theoretical maximum of \SI{1}{\gram}, this cancels the effect of the high latency introduced by the lowpass filters. This however depends strongly on the speed of the transition.
 
 \subsection{Tap detection}
-To detect a tap on the accelerometer, a high-pass filter may be implemented to only pass spikes in the acceleration. Alternatively, the total acceleration $|a|$ may be considered. Previously, the total acceleration was used to determine whether or not an acceleration sample is steady. For $|a| > \SI{1.05}{\gram}$, the sample is not considered for the calculation of the orientation. A simple higher threshold $|a| > \SI{1.1}{\gram}$ has however proven to be a reliable indicator for a tap on the accelerometer. This approach was considered superior to a high-pass filter as the value of $|a|$ was already calculated, the implementation is simpler and the tap can be detected from every direction.
+To detect a tap on the accelerometer, a high-pass filter may be implemented to only pass spikes in the acceleration. Alternatively, the total acceleration $|a|$ may be considered. Previously, the total acceleration was used to determine whether or not an acceleration sample is steady. For $|a| > \SI{1.05}{\gram}$, the sample is not considered for the calculation of the orientation. A simple higher threshold $|a| > \SI{1.1}{\gram}$ has however proven to be a reliable indicator for a tap on the accelerometer. This approach is considered superior to a high-pass filter as the value of $|a|$ was already calculated, the implementation is simpler and the tap can be detected from every direction.
 
+\section{Discussion}
+The main disadvantage of the implemented design is the necessity of the calibration procedure. The measurements could be conducted once and then saved, which would however not work if the accelerometer changed its parameters over time. Moreover, the calibration could be conducted with only two orientations, given that each yields three measurements (one for each axis) and that two measurements per axis are used currently (assuming ideal linearity). This would however require putting the accelerometer in non-trivial positions to ensure maximum distance between the individual measurements. Because this has to be done by hand, it may impact the accuracy.
+
+\clearpage
 \sloppy
 \printbibliography
 

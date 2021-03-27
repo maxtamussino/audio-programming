@@ -1,0 +1,20 @@
+\begin{tikzpicture}
+	\begin{pgfonlayer}{nodelayer}
+		\node [style=Box] (0) at (-5, 2.5) {Not pressed};
+		\node [style=Box] (1) at (5, 2.5) {Pressed (bounce)};
+		\node [style=Box] (2) at (5, -2.5) {Pressed};
+		\node [style=Box] (3) at (-5, -2.5) {Not pressed (bounce)};
+		\node [style=none] (4) at (8, 0) {After $t_d$ s};
+		\node [style=none] (5) at (-8, 0) {After $t_d$ s};
+		\node [style=none] (6) at (1.25, -1.5) {Read HIGH};
+		\node [style=none] (7) at (-0.5, 1.5) {Read LOW};
+		\node [style=STM Start] (8) at (-9.5, 2.5) {};
+	\end{pgfonlayer}
+	\begin{pgfonlayer}{edgelayer}
+		\draw [style=Arrow, bend left=15] (1) to (2);
+		\draw [style=Arrow] (2) to (3);
+		\draw [style=Arrow, bend left=15] (3) to (0);
+		\draw [style=Arrow] (0) to (1);
+		\draw [style=Arrow] (8) to (0);
+	\end{pgfonlayer}
+\end{tikzpicture}
