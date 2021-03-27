@@ -8,6 +8,7 @@
 #include "Filter.h"
 #include <cmath>
 
+// Constructor
 Filter::Filter(float alpha) {
 	// Filter coefficients (LOWPASS)
 	coeff_b0 = 1 - alpha;
@@ -15,6 +16,7 @@ Filter::Filter(float alpha) {
 	coeff_a1 = -alpha;
 }
 
+// TO be called once each frame
 float Filter::process(float input) {
 	// Apply the filter to the input signal
 	float output = coeff_b0 * input + coeff_b1 * last_input - coeff_a1 * last_output;

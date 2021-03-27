@@ -24,22 +24,13 @@
 #include "Filter.h"
 
 
-/* Variables which are given to you: */
-
 /* Drum samples are pre-loaded in these buffers. Length of each
  * buffer is given in gDrumSampleBufferLengths.
  */
 extern float *gDrumSampleBuffers[NUMBER_OF_DRUMS];
 extern int gDrumSampleBufferLengths[NUMBER_OF_DRUMS];
 
-int gIsPlaying = 0;			/* Whether we should play or not. Implement this in Step 4b. */
-
-/* Read pointer into the current drum sample buffer.
- *
- * TODO (step 3): you will replace this with two arrays, one
- * holding each read pointer, the other saying which buffer
- * each read pointer corresponds to.
- */
+/* Read pointers into the current drum sample buffers. */
 const unsigned int kNumConcurrentSamples = 16;
 int gReadPointers[kNumConcurrentSamples];
 int gDrumBufferForReadPointer[kNumConcurrentSamples];
@@ -52,42 +43,39 @@ extern int *gPatterns[NUMBER_OF_PATTERNS];
 extern int gPatternLengths[NUMBER_OF_PATTERNS];
 
 /* These variables indicate which pattern we're playing, and
- * where within the pattern we currently are. Used in Step 4c.
+ * where within the pattern we currently are.
  */
 int gCurrentPattern = 0;
 int gCurrentIndexInPattern = 0;
 
-/* This variable holds the interval between events in **milliseconds**
- * To use it (Step 4a), you will need to work out how many samples
- * it corresponds to.
+/* This variable holds the interval between events in milliseconds.
+ * This is converted to samples directly in render, because the interval
+ * may change (Potentiometer).
  */
 int gEventIntervalMilliseconds = 250;
 int gEventIntervalCounter = 0;
 
-/* This variable indicates whether samples should be triggered or
- * not. It is used in Step 4b, and should be set in gpio.cpp.
- */
-extern int gIsPlaying;
+/* Whether we should play or not. */
+int gIsPlaying = 0;
 
-/* This indicates whether we should play the samples backwards.
- */
+/* This indicates whether we should play the samples backwards. */
 int gPlaysBackwards = 0;
 
-/* For bonus step only: these variables help implement a fill
- * (temporary pattern) which is triggered by tapping the board.
+/* These variables show whether or not we are playing a fill pattern
+ * and the previous pattern we will return to afterwards.
  */
 int gShouldPlayFill = 0;
 int gPreviousPattern = 0;
 
-/* TODO: Declare any further global variables you need here */
-Button gButton0(0); // Digital 0
-Button gButton1(1); // Digital 1
-LED gLed(2);        // Digital 2
-Potentiometer gPotentiometer(0);       // Analog  0
-Accelerometer gAccelerometer(1,2,3,3); // Analog  1 (x)
-									   //         2 (y)
-									   //         3 (z)
-									   // Digital 3 (sleep)
+/* These objects handle hardware interaction */
+Button gButton0(0); 					// Digital 0
+Button gButton1(1); 					// Digital 1
+LED gLed(2);        					// Digital 2
+Potentiometer gPotentiometer(0);        // Analog  0
+Accelerometer gAccelerometer(1,2,3,3);  // Analog  1 (x)
+									    // Analog  2 (y)
+									    // Analog  3 (z)
+									    // Digital 3 (sleep)
 
 
 // setup() is called once before the audio rendering starts.
@@ -217,7 +205,7 @@ void render(BelaContext *context, void *userData)
 				reached_end = gReadPointers[i] < 0;
 			}
 			if (reached_end) {
-				// Deactivate this read pointer
+				// Deactivate this read pointer if end reached
 				gDrumBufferForReadPointer[i] = -1;
 				continue;
 			}
@@ -230,7 +218,7 @@ void render(BelaContext *context, void *userData)
 		}
 		
 		// Rescale output to avoid clipping
-		out *= 0.5;
+		out *= 0.6;
     	
         // Write the output to every audio channel
     	for(unsigned int channel = 0; channel < context->audioOutChannels; channel++) {

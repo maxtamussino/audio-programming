@@ -58,6 +58,7 @@ void Accelerometer::process(BelaContext *context, int frame) {
 	state_new = false;
 	
 	if (frame % audioFramesPerAnalogFrame == 0) {
+		// Read and process all channels
 		for (int i = 0; i < 3; i++) {
 			// Scale input to get value in volt
 			input[i] = 4.096 * analogRead(context, frame / audioFramesPerAnalogFrame, pins[i]);
@@ -74,7 +75,7 @@ void Accelerometer::process(BelaContext *context, int frame) {
 			}
 		}
 		
-		// Only new state possible if new LP output available
+		// Only new state possible if new LP output available 
 		if (downsample_counter == 0) {
 			// Distinguish between constant 1g gravity and shock acceleration, which can be >1g
 			float total_acceleration = sqrt(pow(accelerations_filtered[0],2) + pow(accelerations_filtered[1],2) + pow(accelerations_filtered[2],2));
@@ -84,19 +85,22 @@ void Accelerometer::process(BelaContext *context, int frame) {
 				calculate_new_state();
 			} else if (total_acceleration > 1.1) {
 				tap_detected = true;
+				// Debug output for detected tap
 				//rt_printf("Tap detected: %f\n", total_acceleration);
 			}
 			downsample_counter = downsample_rate;
 		}
 		
+		// Decrease downsample_counter
 		downsample_counter--;
 		
+		// Scope output - either showing all 3 axis measurements or showing filtering
 		scope.log(accelerations_raw[2], accelerations_smooth[2], accelerations_filtered[2]);
 		//scope.log(accelerations_filtered[0], accelerations_filtered[1], accelerations_filtered[2]);
 	}
 }
 
-// Calculates new state
+// Calculates new state (see state transition diagram)
 void Accelerometer::calculate_new_state() {
 	switch (state) {
 		case flat:
@@ -135,11 +139,12 @@ void Accelerometer::calculate_new_state() {
 	}
 }
 
-// Sets new state
+// Sets new state and indicates it is new
 void Accelerometer::set_new_state(Accelerometer::status_e new_state) {
 	state = new_state;
 	state_new = true;
 	
+	// Debug output
 	/*
 	rt_printf("New state: ");
 	switch (new_state) {
@@ -191,6 +196,8 @@ void Accelerometer::calibrate() {
 	input_0g[other_axis_1] = input[other_axis_1];
 	input_0g[other_axis_2] = input[other_axis_2];
 	input_1g[axis] = input[axis];
+	
+	// Debug output
 	/*
 	rt_printf("Calibrated axis %d: [x=%f, y=%f, z=%f]", axis, input[0], input[1], input[2]);
 	rt_printf("--> 1g of %d at %f V\n", axis, input_1g[axis]);

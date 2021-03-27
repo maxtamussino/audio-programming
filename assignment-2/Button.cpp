@@ -35,15 +35,18 @@ void Button::setup(BelaContext *context, int debounce_ms) {
 void Button::process(BelaContext *context, int frame) {
 	if (!setup_done) return;
 	
+	// Read inputs and reset events
 	int current_read = digitalRead(context, frame, pin);
 	if (event_pressed) event_pressed = false;
 	if (event_released) event_released = false;
 	
 	switch (status) {
 		case pressed_bounce:
+			// If counter zero, transition to normal pressed status
 			if (--debounce_counter == 0) status = pressed;
     		break;
     	case pressed:
+    		// If HIGH, transition to debounce notpressed status and set released event
 			if (current_read == HIGH) {
 				event_released = true;
 				status = notpressed_bounce;
@@ -51,9 +54,11 @@ void Button::process(BelaContext *context, int frame) {
 			}
     		break;
     	case notpressed_bounce:
+    		// If counter zero, transition to normal notpressed status
 			if (--debounce_counter == 0) status = notpressed;
     		break;
     	case notpressed:
+    		// If LOW, transition to debounce pressed status and set pressed event
 			if (current_read == LOW) {
 				event_pressed = true;
 				status = pressed_bounce;
