@@ -28,7 +28,7 @@ public:
 	// Destructor
 	~CircularBuffer() {}
 	
-private:
+protected:
 	// Info
 	unsigned int bufferLength_, writePointer_;
 	bool setupDone_ = false;
