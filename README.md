@@ -1,4 +1,4 @@
-# audio-programming
+# realtime-programming
 Exercises for ECS7012P - Music and Audio Programming
 
 ## Summary
